@@ -1,0 +1,83 @@
+---
+# Publishes the harpworks package repository to GitHub Pages.
+#
+# The repository is derived from the GitHub Releases of every project listed
+# in projects.txt — every rpm and deb ever released, indexed and signed — and
+# deployed as static files. There is no branch to maintain and no state to
+# migrate: each project's releases page stays the source of truth, and this
+# is a view of it. See build.sh for what is signed and why.
+name: Repository
+
+on:
+  # A project's release workflow cannot trigger this one without a token that
+  # reaches across repositories, so the repository is rebuilt on a schedule
+  # and on demand. A release appears here within the hour, or immediately
+  # with `gh workflow run repository.yml -R miharp/packages`.
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Index and sign every release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install createrepo_c and apt-ftparchive
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q createrepo-c apt-utils
+
+      - name: Fetch every project's released packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p pkgs
+          while read -r project; do
+            [ -n "$project" ] || continue
+            for tag in $(gh release list -R "$project" --limit 200 --json tagName -q '.[].tagName'); do
+              gh release download "$tag" -R "$project" --dir pkgs --pattern '*.rpm' --pattern '*.deb' --skip-existing
+            done
+          done < projects.txt
+          ls pkgs
+
+      - name: Import the signing key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.REPO_GPG_PRIVATE_KEY }}
+        run: |
+          [ -n "$GPG_PRIVATE_KEY" ] || { echo "REPO_GPG_PRIVATE_KEY is not set; refusing to publish an unsigned repository" >&2; exit 1; }
+          printf '%s' "$GPG_PRIVATE_KEY" | gpg --batch --import
+          gpg --batch --list-secret-keys --with-colons | awk -F: '/^sec/{print $5; exit}' > keyid
+          echo "key $(cat keyid)"
+
+      - name: Build the repository
+        env:
+          GPG_PASSPHRASE: ${{ secrets.REPO_GPG_PASSPHRASE }}
+        run: ./build.sh pkgs site "$(cat keyid)"
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
