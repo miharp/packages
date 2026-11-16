@@ -46,8 +46,9 @@ cannot be installed by mistake.
 
 Add its `owner/name` to [`projects.txt`](projects.txt). Its releases must carry
 `.rpm` and `.deb` assets named `<package>_<version>_linux_<arch>`, as
-GoReleaser's nfpm produces. The next run picks up every release it has ever
-made.
+GoReleaser's nfpm produces. A package that serves every architecture uses
+`noarch` for the rpm and `all` for the deb. The next run picks up every release
+it has ever made.
 
 A project that ships a gem attaches the `.gem` and every dependency gem it
 needs beyond a stock Ruby to its releases. The workflow fails if a project's

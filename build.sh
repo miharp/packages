@@ -112,8 +112,10 @@ else
 fi
 
 # --- the front page -------------------------------------------------------
-packages=$(for f in "$site"/rpm/*_linux_amd64.rpm; do basename "$f" | sed 's/^\(.*\)_\(.*\)_linux_amd64\.rpm$/\1 \2/'; done \
-  | sort -k1,1 -k2,2V | awk '{last[$1]=$2} END {for (p in last) print "<li><code>" p "</code> " last[p] "</li>"}' | sort)
+# Every rpm, whatever its architecture: a package built for all of them is
+# named _linux_noarch and would be missed by looking at one architecture.
+packages=$(for f in "$site"/rpm/*.rpm; do basename "$f" | sed 's/^\(.*\)_\(.*\)_linux_[a-z0-9_]*\.rpm$/\1 \2/'; done \
+  | sort -u -k1,1 -k2,2V | awk '{last[$1]=$2} END {for (p in last) print "<li><code>" p "</code> " last[p] "</li>"}' | sort)
 # The index also holds dependencies; list only each project's own gem.
 gem_items=$(sed 's|.*/||' "$(dirname "$0")/projects.txt" | while read -r name; do
   [ -n "$name" ] || continue
