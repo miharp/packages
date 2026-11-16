@@ -1,7 +1,8 @@
 # harpworks packages
 
-The yum and apt repository at <https://packages.harpworks.org>: packages for
-tools for OpenVox, currently [codavox](https://github.com/miharp/codavox).
+The yum, apt and gem repository at <https://packages.harpworks.org>: packages
+for tools for OpenVox, currently [codavox](https://github.com/miharp/codavox)
+and [ovlens](https://github.com/miharp/ovlens).
 
 It is static files on GitHub Pages, rebuilt in full from each listed project's
 GitHub Releases by the [Repository workflow](.github/workflows/repository.yml)
@@ -29,12 +30,29 @@ echo "deb [signed-by=/etc/apt/keyrings/harpworks.asc] https://packages.harpworks
 apt-get update && apt-get install codavox
 ```
 
+Gems go into the OpenVox agent's Ruby:
+
+```console
+/opt/puppetlabs/puppet/bin/gem install --clear-sources --source https://packages.harpworks.org/gems ovlens
+```
+
+**The gem index is not signed.** RubyGems has no counterpart to signed
+repository metadata, so HTTPS to this site is what vouches for it. The index
+carries each gem's dependencies, which is why `--clear-sources` works: nothing
+is fetched from rubygems.org, and a gem published there under the same name
+cannot be installed by mistake.
+
 ## Add a project
 
 Add its `owner/name` to [`projects.txt`](projects.txt). Its releases must carry
 `.rpm` and `.deb` assets named `<package>_<version>_linux_<arch>`, as
-GoReleaser's nfpm produces. The next run picks up every release it has ever
-made.
+GoReleaser's nfpm produces. A package that serves every architecture uses
+`noarch` for the rpm and `all` for the deb. The next run picks up every release
+it has ever made.
+
+A project that ships a gem attaches the `.gem` and every dependency gem it
+needs beyond a stock Ruby to its releases. The workflow fails if a project's
+gem cannot be installed from the index alone.
 
 ## Publish a release now
 
